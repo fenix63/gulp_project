@@ -2,6 +2,7 @@
 <html>
   <head>
     <title>hhm - тестовое задание</title>
+    <meta charset="utf-8">
     <link rel="stylesheet" href="css/bootstrap.css"/>
     <link rel="stylesheet" href="css/bootstrap-theme.css"/>
     <link rel="stylesheet" href="css/bundle.css"/>
@@ -59,7 +60,10 @@
         </div>
       </div>
     </div>
-  </div><?php phpinfo(); ?>
+  </div>
+  <?php
+  include 'php/connect.php';
+  ?>
   <footer>
     <div class="container">
       <div class="row logo">

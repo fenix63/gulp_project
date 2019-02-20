@@ -1,132 +1,93 @@
-'use strict';
+var gulp       = require('gulp'), // Подключаем Gulp
+  sass         = require('gulp-sass'), //Подключаем Sass пакет,
+  browserSync  = require('browser-sync'), // Подключаем Browser Sync
+  concat       = require('gulp-concat'), // Подключаем gulp-concat (для конкатенации файлов)
+  uglify       = require('gulp-uglifyjs'), // Подключаем gulp-uglifyjs (для сжатия JS)
+  cssnano      = require('gulp-cssnano'), // Подключаем пакет для минификации CSS
+  rename       = require('gulp-rename'), // Подключаем библиотеку для переименования файлов
+  del          = require('del'), // Подключаем библиотеку для удаления файлов и папок
+  imagemin     = require('gulp-imagemin'), // Подключаем библиотеку для работы с изображениями
+  pngquant     = require('imagemin-pngquant'), // Подключаем библиотеку для работы с png
+  cache        = require('gulp-cache'), // Подключаем библиотеку кеширования
+  autoprefixer = require('gulp-autoprefixer');// Подключаем библиотеку для автоматического добавления префиксов
 
-var gulp = require('gulp'),
-    prefixer = require('gulp-autoprefixer'),
-    uglify = require('gulp-uglify'),
-    watch = require('gulp-watch'),
-    sass = require('gulp-sass'),
-    html = require('gulp-minify-html'),
-    rigger = require('gulp-rigger'),
-    cssmin = require('gulp-minify-css'),
-    imagemin = require('gulp-imagemin'),
-    pngquant = require('imagemin-pngquant'),
-    browserSync = require('browser-sync'),
-    jade = require('gulp-jade'),
-    reload = browserSync.reload;
+gulp.task('sass', function(){ // Создаем таск Sass
+  return gulp.src('app/sass/**/*.sass') // Берем источник
+    .pipe(sass()) // Преобразуем Sass в CSS посредством gulp-sass
+    .pipe(autoprefixer(['last 15 versions', '> 1%', 'ie 8', 'ie 7'], { cascade: true })) // Создаем префиксы
+    .pipe(gulp.dest('app/css')) // Выгружаем результата в папку app/css
+    .pipe(browserSync.reload({stream: true})) // Обновляем CSS на странице при изменении
+});
 
-var path = {
-    public: {
-        html:'public/',
-        js:'public/js/',
-        css:'public/css/',
-        img:'public/images/'
+gulp.task('browser-sync', function() { // Создаем таск browser-sync
+  browserSync({ // Выполняем browserSync
+    server: { // Определяем параметры сервера
+      baseDir: 'app' // Директория для сервера - app
     },
-
-    private:{
-        jade: 'private/*.jade',
-        html:'private/html/**/*.html',
-        js:'private/js/bundle.js',
-        css:'private/css/bundle.sass',
-        img:'private/images/**/*.*'
-    },
-
-    watch: {
-        jade: 'private/*.jade',
-        html:'public/**/*.html',
-        js: 'private/js/**/*.js',
-        css: 'private/css/**/*.sass',
-        img: 'private/images/**/*.*'
-    }
-}
-
-var config = {
-    server: {
-        baseDir: './public'
-    },
-    tunnel: false,
-    host: 'localhost',
-    port: 9000,
-    logPrefix: 'frontend_test'
-};
-
-
-gulp.task('jade', function() {
-    gulp.src('private/*.jade')
-        .pipe(jade({
-            locals: '',
-            pretty: true
-        }))
-        .pipe(gulp.dest('public/'))
-        .pipe(reload({stream:true}));
+    notify: false // Отключаем уведомления
+  });
 });
 
-
-gulp.task('js:build', function(){
-   gulp.src(path.private.js)
-       .pipe(rigger())
-       .pipe(uglify())
-       .pipe(gulp.dest(path.public.js))
-       .pipe(reload({stream:true}));
+gulp.task('scripts', function() {
+  return gulp.src([ // Берем все необходимые библиотеки
+    'app/libs/jquery/dist/jquery.min.js', // Берем jQuery
+    'app/libs/magnific-popup/dist/jquery.magnific-popup.min.js' // Берем Magnific Popup
+    ])
+    .pipe(concat('libs.min.js')) // Собираем их в кучу в новом файле libs.min.js
+    .pipe(uglify()) // Сжимаем JS файл
+    .pipe(gulp.dest('app/js')); // Выгружаем в папку app/js
 });
 
-gulp.task('css:build', function(){
-   gulp.src(path.private.css)
-       .pipe(sass())
-       .pipe(prefixer())
-       .pipe(cssmin())
-       .pipe(gulp.dest(path.public.css))
-       .pipe(reload({stream:true}));
+gulp.task('css-libs', ['sass'], function() {
+  return gulp.src('app/css/libs.css') // Выбираем файл для минификации
+    .pipe(cssnano()) // Сжимаем
+    .pipe(rename({suffix: '.min'})) // Добавляем суффикс .min
+    .pipe(gulp.dest('app/css')); // Выгружаем в папку app/css
 });
 
-gulp.task('image:build', function(){
-   gulp.src(path.private.img)
-       .pipe(imagemin({
-           progressive:true,
-           svgoPlugins: [{removeViewBox: false}],
-           use: [pngquant()],
-           interlaced:true
-       }))
-       .pipe(gulp.dest(path.public.img))
-       .pipe(reload({stream:true}));
+gulp.task('watch', ['browser-sync', 'css-libs', 'scripts'], function() {
+  gulp.watch('app/sass/**/*.sass', ['sass']); // Наблюдение за sass файлами в папке sass
+  gulp.watch('app/*.html', browserSync.reload); // Наблюдение за HTML файлами в корне проекта
+  gulp.watch('app/js/**/*.js', browserSync.reload);   // Наблюдение за JS файлами в папке js
 });
 
-gulp.task('html:build', function(){
-   gulp.src(path.watch.html)
-       .pipe(reload({stream:true}));
+gulp.task('clean', function() {
+  return del.sync('dist'); // Удаляем папку dist перед сборкой
 });
 
-gulp.task('build',[
-    'jade',
-   'js:build',
-    'css:build',
-    'image:build',
-    'html:build'
-]);
+gulp.task('img', function() {
+  return gulp.src('app/img/**/*') // Берем все изображения из app
+    .pipe(cache(imagemin({ // С кешированием
+    // .pipe(imagemin({ // Сжимаем изображения без кеширования
+      interlaced: true,
+      progressive: true,
+      svgoPlugins: [{removeViewBox: false}],
+      use: [pngquant()]
+    }))/**/)
+    .pipe(gulp.dest('dist/img')); // Выгружаем на продакшен
+});
 
-gulp.task('watch', function(){
-    gulp.watch('private/*.jade',['jade']);//отслеживание jade файлов
+gulp.task('build', ['clean', 'img', 'sass', 'scripts'], function() {
 
-    watch([path.watch.html], function () {
-       gulp.start('html:build');
-   });
+  var buildCss = gulp.src([ // Переносим библиотеки в продакшен
+    'app/css/main.css',
+    'app/css/libs.min.css'
+    ])
+  .pipe(gulp.dest('dist/css'))
 
-    watch([path.watch.css], function () {
-        gulp.start('css:build');
-    });
+  var buildFonts = gulp.src('app/fonts/**/*') // Переносим шрифты в продакшен
+  .pipe(gulp.dest('dist/fonts'))
 
-    watch([path.watch.js], function () {
-        gulp.start('js:build');
-    });
+  var buildJs = gulp.src('app/js/**/*') // Переносим скрипты в продакшен
+  .pipe(gulp.dest('dist/js'))
 
-    watch([path.watch.img], function () {
-        gulp.start('image:build');
-    });
-
+  var buildHtml = gulp.src('app/*.html') // Переносим HTML в продакшен
+  .pipe(gulp.dest('dist'));
 
 });
 
-gulp.task('webserver', function(){
-    browserSync(config);
-});
+gulp.task('clear', function (callback) {
+  return cache.clearAll();
+})
 
-gulp.task('default',['build','watch', 'webserver']);
+gulp.task('default', ['watch']);
